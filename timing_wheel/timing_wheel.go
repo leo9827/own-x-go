@@ -146,7 +146,7 @@ func Init() {
 						}()
 					}
 				}
-
+				// TODO: use timer + chan/select replace
 				time.Sleep(time.Millisecond * 100) // bucket interval
 			}
 		}
