@@ -28,7 +28,6 @@ func (p *pool) run() {
 			fmt.Println(job)
 			signalChan := make(chan os.Signal, 1)
 			signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-
 		}
 	}
 }
