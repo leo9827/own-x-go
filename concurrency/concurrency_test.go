@@ -28,7 +28,7 @@ func TestClose(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			fmt.Println(salutation)
+			fmt.Println(salutation) // not in close area
 		}()
 	}
 	wg.Wait()
