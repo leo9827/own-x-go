@@ -25,6 +25,7 @@
         <method importPath="bytes" receiver="*Buffer" name="WriteByte" />
         <method importPath="bytes" receiver="*Buffer" name="Write" />
         <method importPath="github.com/uptrace/bun" receiver="Tx" name="Rollback" />
+        <method importPath="text/tabwriter" receiver="*Writer" name="Flush" />
       </methods>
     </inspection_tool>
   </profile>
