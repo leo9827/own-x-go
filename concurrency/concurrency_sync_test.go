@@ -2,7 +2,9 @@ package concurrency
 
 import (
 	"fmt"
+	"log"
 	"math"
+	"net"
 	"os"
 	"runtime"
 	"sync"
@@ -28,7 +30,7 @@ func TestClose(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			fmt.Println(salutation) // not in close area
+			fmt.Println(salutation) // not in closure
 		}()
 	}
 	wg.Wait()
@@ -333,4 +335,46 @@ func TestPool2(t *testing.T) {
 
 	wg.Wait()
 	fmt.Printf("%d calculators were created.\n", numCalcsCreated) // 16
+}
+
+func TestPool3(t *testing.T) {
+	warmServiceConnCache := func() *sync.Pool {
+		p := &sync.Pool{
+			New: func() interface{} {
+				time.Sleep(1 * time.Second)
+				return struct{}{}
+			},
+		}
+		for i := 0; i < 10; i++ {
+			p.Put(p.New())
+		}
+		return p
+	}
+	startNetworkDaemon := func() *sync.WaitGroup {
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			connPool := warmServiceConnCache()
+			server, err := net.Listen("tcp", "localhost:8080")
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer server.Close()
+			wg.Done()
+
+			for {
+				conn, err := server.Accept()
+				if err != nil {
+					log.Printf("cannot accept connection: %v", err)
+					continue
+				}
+				svcConn := connPool.Get()
+				fmt.Fprintln(conn, "")
+				connPool.Put(svcConn)
+				conn.Close()
+			}
+		}()
+		return &wg
+	}
+	startNetworkDaemon()
 }
