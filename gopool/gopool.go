@@ -1,39 +1,32 @@
 package gopool
 
-import (
-	"context"
-	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-)
+import "context"
 
-type pool struct {
-	queue chan []byte
+var defaultPool Pool
+
+func init() {
+	defaultPool = NewPool("default", 1000, NewConfig())
 }
-
-var defaultPool = &pool{}
 
 func Go(f func()) {
-
+	CtxGo(context.Background(), f)
 }
 
-func (p *pool) run() {
-	for {
-		select {
-		case <-time.After(1 * time.Second):
-			fmt.Println("after 1 second")
-		case job := <-p.queue:
-			fmt.Println(job)
-			signalChan := make(chan os.Signal, 1)
-			signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-		}
-	}
+func CtxGo(ctx context.Context, f func()) {
+	defaultPool.CtxGo(ctx, f)
 }
 
-type Pool interface {
-	Submit(f func())
-	Go(f func())
-	CtxGo(ctx context.Context, f func())
+// SetCap is not recommended to be called, this func changes the global pool's capacity which will affect other callers.
+func SetCap(cap int32) {
+	defaultPool.SetCap(cap)
+}
+
+// SetPanicHandler sets the panic handler for the global pool.
+func SetPanicHandler(f func(context.Context, interface{})) {
+	defaultPool.SetPanicHandler(f)
+}
+
+// WorkerCount returns the number of global default pool's running workers
+func WorkerCount() int32 {
+	return defaultPool.WorkerCount()
 }
