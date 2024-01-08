@@ -11,27 +11,28 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type Logrus struct {
-	std *logrus.Logger
-	mu  sync.Mutex
+type LoggerImpl struct {
+	mu     sync.Mutex
+	stdout *logrus.Logger
 }
 
-var DefaultLogger *Logrus
+var DefaultLogger *LoggerImpl
+var defaultLoggerInit sync.Once
 
-func New() *Logrus {
-
-	l := &Logrus{
-		std: logrus.New(),
+func New() *LoggerImpl {
+	l := &LoggerImpl{
+		stdout: logrus.New(),
 	}
-	l.SetLevel("debug")
+	l.SetLevel(string(DebugLevel))
 	if DefaultLogger == nil {
-		DefaultLogger = l
+		defaultLoggerInit.Do(func() {
+			DefaultLogger = l
+		})
 	}
-
 	return l
 }
 
-func (l *Logrus) DecorateRuntimeContext(skip int) *logrus.Entry {
+func (l *LoggerImpl) decorate(skip int) *logrus.Entry {
 	if pc, file, line, ok := runtime.Caller(skip); ok {
 		fName := runtime.FuncForPC(pc).Name()
 		path := strings.Split(file, string(os.PathSeparator))
@@ -41,70 +42,70 @@ func (l *Logrus) DecorateRuntimeContext(skip int) *logrus.Entry {
 		} else {
 			position = fmt.Sprintf("%s:%d", strings.Join(path, string(os.PathSeparator)), line)
 		}
-		return l.std.WithField("position", position).WithField("func", fName)
+		return l.stdout.WithField("position", position).WithField("func", fName)
 	} else {
-		return logrus.NewEntry(l.std)
+		return logrus.NewEntry(l.stdout)
 	}
 }
 
-func (l *Logrus) Trace(format string, v ...interface{}) {
-	l.DecorateRuntimeContext(2).Tracef(format, v...)
+func (l *LoggerImpl) Trace(format string, v ...interface{}) {
+	l.decorate(2).Tracef(format, v...)
 }
 
-func (l *Logrus) Debug(format string, v ...interface{}) {
-	l.DecorateRuntimeContext(2).Debugf(format, v...)
+func (l *LoggerImpl) Debug(format string, v ...interface{}) {
+	l.decorate(2).Debugf(format, v...)
 }
 
-func (l *Logrus) Info(format string, v ...interface{}) {
-	l.DecorateRuntimeContext(2).Infof(format, v...)
+func (l *LoggerImpl) Info(format string, v ...interface{}) {
+	l.decorate(2).Infof(format, v...)
 }
 
-func (l *Logrus) Warn(format string, v ...interface{}) {
-	l.DecorateRuntimeContext(2).Warnf(format, v...)
+func (l *LoggerImpl) Warn(format string, v ...interface{}) {
+	l.decorate(2).Warnf(format, v...)
 }
 
-func (l *Logrus) Error(format string, v ...interface{}) {
-	l.DecorateRuntimeContext(2).Errorf(format, v...)
+func (l *LoggerImpl) Error(format string, v ...interface{}) {
+	l.decorate(2).Errorf(format, v...)
 }
 
-func (l *Logrus) Fatal(format string, v ...interface{}) {
-	l.DecorateRuntimeContext(2).Fatalf(format, v...)
+func (l *LoggerImpl) Fatal(format string, v ...interface{}) {
+	l.decorate(2).Fatalf(format, v...)
 }
 
-func (l *Logrus) Panic(format string, v ...interface{}) {
-	l.DecorateRuntimeContext(2).Panicf(format, v...)
+func (l *LoggerImpl) Panic(format string, v ...interface{}) {
+	l.decorate(2).Panicf(format, v...)
 }
 
-func (l *Logrus) SetOutput(out io.Writer) {
+func (l *LoggerImpl) SetOutput(out io.Writer) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.std.Out = out
+	l.stdout.Out = out
 }
 
-func (l *Logrus) SetReportCaller(b bool) {
-	l.std.SetReportCaller(b)
+func (l *LoggerImpl) SetReportCaller(b bool) {
+	l.stdout.SetReportCaller(b)
 }
 
-func (l *Logrus) GetOutput() io.Writer {
-	if l.std != nil && l.std.Out != nil {
-		return l.std.Out
+func (l *LoggerImpl) GetOutput() io.Writer {
+	if l.stdout != nil && l.stdout.Out != nil {
+		return l.stdout.Out
 	}
 	return nil
 }
 
-func (l *Logrus) GetLevel() int {
+func (l *LoggerImpl) GetLevel() int {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return int(l.std.Level)
+	return int(l.stdout.Level)
 }
 
-func (l *Logrus) setLevel(level int) {
+func (l *LoggerImpl) setLevel(level int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.std.Level = logrus.Level(level)
+	l.stdout.Level = logrus.Level(level)
 }
 
-func (l *Logrus) SetLevel(level string) {
+func (l *LoggerImpl) SetLevel(level string) {
 	switch strings.ToLower(level) {
 	case "debug":
 		l.setLevel(LevelDebug)
@@ -119,8 +120,8 @@ func (l *Logrus) SetLevel(level string) {
 	}
 }
 
-func (l *Logrus) SetFormatter(formatter logrus.Formatter) {
+func (l *LoggerImpl) SetFormatter(formatter logrus.Formatter) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.std.Formatter = formatter
+	l.stdout.Formatter = formatter
 }

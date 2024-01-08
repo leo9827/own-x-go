@@ -57,9 +57,13 @@ func GetIntranetIp() ([]string, error) {
 		return localIps, err
 	}
 	for _, address := range addrs {
-		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && !ipnet.IP.IsLinkLocalUnicast() && !ipnet.IP.IsLinkLocalMulticast() {
-			if ipnet.IP.To4() != nil {
-				localIps = append(localIps, ipnet.IP.String())
+		ipNet, ok := address.(*net.IPNet)
+		if ok &&
+			!ipNet.IP.IsLoopback() &&
+			!ipNet.IP.IsLinkLocalUnicast() &&
+			!ipNet.IP.IsLinkLocalMulticast() {
+			if ipNet.IP.To4() != nil {
+				localIps = append(localIps, ipNet.IP.String())
 			}
 		}
 	}

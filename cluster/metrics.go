@@ -7,14 +7,12 @@ import (
 var clusterStatusGauge = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "cluster_status",
-		Help: "集群主从状态",
+		Help: "cluster master slave status",
 	},
 	[]string{"ip"},
 )
 
-// 初始化 prometheus 指标
 func init() {
-	// 注册
 	prometheus.MustRegister(clusterStatusGauge)
 }
 
@@ -25,14 +23,11 @@ func (cluster *Cluster) updateMetrics() {
 		IsLeader := cluster.IsLeader()
 		switch isReady {
 		case false:
-			// 集群状态没有就绪
 			clusterStatusGauge.WithLabelValues(ip).Set(-1)
 		case true:
 			switch IsLeader {
-			// 从节点
 			case false:
 				clusterStatusGauge.WithLabelValues(ip).Set(0)
-			// 主节点
 			case true:
 				clusterStatusGauge.WithLabelValues(ip).Set(1)
 			}

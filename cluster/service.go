@@ -3,30 +3,74 @@ package cluster
 import (
 	"ownx/env"
 	"ownx/log"
+	"ownx/nio"
 	"sync"
 	"time"
 )
 
+var DefaultCluster *Cluster
+
+type Cluster struct {
+	logger          log.Logger
+	lock            sync.Mutex
+	fightingLock    sync.Mutex
+	configure       *Conf
+	nodesAll        *sync.Map
+	nodesAlive      *sync.Map
+	nodeLeader      *Node
+	lostLeaderTime  time.Time
+	nodeMy          *Node
+	status          stat
+	fighting        bool
+	sendAndWaitChan chan *NodeMsg
+	serviceAcceptor *nio.SocketAcceptor
+	taskTracker     map[string]func(data interface{})
+	events          chan event
+	closeOnce       sync.Once
+}
+
+type Conf struct {
+	Model       string
+	NodeTimeout int64 `yaml:"node_timeout"`
+	Nodes       []*NodeConf
+}
+
+type Service interface {
+	StartUp()
+	Close()
+	IsFighting() bool
+	IsClose() bool
+	IsReady() bool
+	IsLeader() bool
+	IsCandidate() bool
+	IsFollower() bool
+	GetLeaderNode() *Node
+	GetMyNode() *Node
+	GetMyId() string
+	GetMyName() string
+	GetMyTerm() int
+	GetAllNodeNames() []string
+	GetAliveNodeNames() []string
+	GetLostNodeNames() []string
+	Events() <-chan event
+}
+
 func Create(clusterConfig *Conf, logger log.Logger) *Cluster {
 
-	// 如果集群配置为空，初始化一个空的配置
 	if clusterConfig == nil {
 		clusterConfig = &Conf{}
 	}
 
-	// 校验一次集群模式，默认情况下为单节点模式
 	switch clusterConfig.Model {
 	case modelCluster, modelSingle:
 	default:
 		clusterConfig.Model = modelSingle
 	}
 
-	// 设置默认超时时间，10秒
 	if clusterConfig.NodeTimeout <= 0 {
 		clusterConfig.NodeTimeout = 10
 	}
 
-	// 初始化集群实例
 	cluster := &Cluster{
 		logger:         logger,
 		configure:      clusterConfig,
@@ -39,42 +83,36 @@ func Create(clusterConfig *Conf, logger log.Logger) *Cluster {
 
 	cluster.createEvent("Init")
 
-	// 加载配置中所有节点
 	cluster.loadAllNodes()
 
-	// 标识本地节点
 	cluster.findMyNode()
 
-	// 打印本地节点信息
 	if cluster.nodeMy == nil {
-		cluster.logger.Error("[Cluster Service] [init] Local node not found.")
+		cluster.logger.Error("Cluster Create failed, local node not found.")
 	} else {
-		cluster.logger.Info("[Cluster Service] [init] finished. local node is %s - %s", cluster.nodeMy.name, cluster.nodeMy.id)
+		cluster.logger.Info("Cluster Create finished, local node is [%s, %s]", cluster.nodeMy.name, cluster.nodeMy.id)
 	}
 
-	// 返回集群实例
 	return cluster
 }
 
 func (cluster *Cluster) StartUp() {
-
 	cluster.createEvent("StartUp")
 
 	switch cluster.configure.Model {
 	case modelCluster:
 		if cluster.nodeMy == nil {
-			// 集群模式，没有本地节点，报错
-			cluster.logger.Error("[Cluster Service] [startup] failed. Local node not found. please check the configuration file.")
+
+			cluster.logger.Error("[StartUp] failed. Local node not found. please check the configuration file.")
 			return
 		}
 	case modelSingle:
-		// 单节点模式，直接进入Leader状态
-		cluster.logger.Info("[Cluster Service] [startup] ^_^ %s I'am in single model.", cluster.GetMyId())
+
+		cluster.logger.Info("[StartUp] %s is in single model!", cluster.GetMyId())
 		cluster.signLeader(cluster.nodeMy)
 		return
 	}
 
-	// 全局只能启动一次
 	cluster.lock.Lock()
 	if cluster.status > 0 {
 		cluster.lock.Unlock()
@@ -83,7 +121,6 @@ func (cluster *Cluster) StartUp() {
 	cluster.status = statusFollower
 	cluster.lock.Unlock()
 
-	// 开启服务
 	cluster.openService()
 }
 
@@ -91,24 +128,21 @@ func (cluster *Cluster) Close() {
 
 	cluster.closeOnce.Do(func() {
 
-		cluster.logger.Info("[Cluster Service] [close] cluster node %s shutting down.", cluster.GetMyName())
+		cluster.logger.Info("[Close] cluster node %s is shutting down.", cluster.GetMyName())
 
 		cluster.status = statusClosed
 		cluster.createEvent("Close")
 
-		// 关闭服务端端口服务
 		if cluster.serviceAcceptor != nil {
 			cluster.serviceAcceptor.Close()
 			cluster.serviceAcceptor = nil
 		}
 
-		// 关闭事件
 		if cluster.events != nil {
 			close(cluster.events)
 			cluster.events = nil
 		}
 
-		// 关闭与其它节点的连接
 		cluster.nodesAll.Range(
 			func(key, val interface{}) bool {
 				if _node, ok := val.(*Node); ok {
@@ -234,11 +268,11 @@ func (cluster *Cluster) GetLostNodeNames() []string {
 	nodes := make([]string, 0)
 	cluster.nodesAll.Range(
 		func(key, val interface{}) bool {
-			// 排除自己这个节点
+
 			if _node, ok := val.(*Node); ok && _node.id != cluster.GetMyId() {
-				if _, ok := cluster.nodesAlive.Load(_node.id); !ok { //不在在线节点列表中
+				if _, ok := cluster.nodesAlive.Load(_node.id); !ok {
 					nodes = append(nodes, _node.name)
-				} else if _node.isTimeOut(cluster.configure.NodeTimeout) { //超时节点
+				} else if _node.isTimeOut(cluster.configure.NodeTimeout) {
 					nodes = append(nodes, _node.name)
 				}
 			}
@@ -251,11 +285,11 @@ func (cluster *Cluster) GetLostNodeIps() []string {
 	ips := make([]string, 0)
 	cluster.nodesAll.Range(
 		func(key, val interface{}) bool {
-			// 排除自己这个节点
+
 			if _node, ok := val.(*Node); ok && _node.id != cluster.GetMyId() {
-				if _, ok := cluster.nodesAlive.Load(_node.id); !ok { // 不在在线节点列表中
+				if _, ok := cluster.nodesAlive.Load(_node.id); !ok {
 					ips = append(ips, _node.ip)
-				} else if _node.isTimeOut(cluster.configure.NodeTimeout) { // 超时节点
+				} else if _node.isTimeOut(cluster.configure.NodeTimeout) {
 					ips = append(ips, _node.ip)
 				}
 			}
@@ -270,14 +304,12 @@ func (cluster *Cluster) Events() <-chan event {
 
 func (cluster *Cluster) loadAllNodes() {
 
-	// 从配置中获取全部节点列表
 	nodes := cluster.configure.Nodes
 	if nodes == nil || len(nodes) == 0 {
-		cluster.logger.Warn("[Cluster Service] [init] Can't find any node.")
+		cluster.logger.Warn("Can't find any node.")
 		return
 	}
 
-	// 缓存
 	_tmp := make([]string, 0)
 	for _, node := range nodes {
 		n := &Node{
@@ -293,7 +325,7 @@ func (cluster *Cluster) loadAllNodes() {
 		cluster.nodesAll.Store(n.id, n)
 	}
 
-	cluster.logger.Info("[Cluster Service] [init] All nodes in configure: %s", ToJson(_tmp))
+	cluster.logger.Info("All nodes in configure: %s", ToJson(_tmp))
 }
 
 func (cluster *Cluster) findMyNode() {
@@ -301,7 +333,6 @@ func (cluster *Cluster) findMyNode() {
 	nodeDir := Replace(env.GetProgramPath(), "[/][^/]+$", "")
 	nodeDir = Replace(nodeDir, ".*/", "")
 
-	// 优先使用名称进行本地节点匹配
 	if nodeDir != "" {
 		nodeDir = "node_" + nodeDir
 		cluster.nodesAll.Range(
@@ -314,25 +345,22 @@ func (cluster *Cluster) findMyNode() {
 			})
 	}
 
-	// 如果已标识出本地节点，直接返回
 	if cluster.nodeMy != nil {
 		return
 	}
 
-	// 获取本机的IP地址
 	myIps, err := GetIntranetIp()
 	if err != nil {
-		cluster.logger.Error("[Cluster Service] [init] Get local address failed. %s", err.Error())
+		cluster.logger.Error("Get local address failed. %s", err.Error())
 		return
 	}
 	if myIps == nil || len(myIps) == 0 {
-		cluster.logger.Error("[Cluster Service] [init] Any local address is not found.")
+		cluster.logger.Error("Any local address is not found.")
 		return
 	}
 
-	cluster.logger.Info("[Cluster Service] [init] My ip list: %s, My program directory is %s", myIps, nodeDir)
+	cluster.logger.Info("ip list: %s, program directory is %s", myIps, nodeDir)
 
-	// 从所有ip中进行筛选
 	for _, ip := range myIps {
 		cluster.nodesAll.Range(
 			func(key, val interface{}) bool {
@@ -344,12 +372,10 @@ func (cluster *Cluster) findMyNode() {
 			})
 	}
 
-	// 如果已标识出本地节点，直接返回
 	if cluster.nodeMy != nil {
 		return
 	}
 
-	// 如果还没有标识出来本地节点，并且当前是单点模式，那么随机使用一个ip地址注册为本地节点
 	if cluster.nodeMy == nil && cluster.configure.Model == modelSingle {
 		hip := env.GetHostIp()
 		if hip == "" {
@@ -364,25 +390,25 @@ func (cluster *Cluster) findMyNode() {
 func (cluster *Cluster) signLeader(newLeaderNode *Node) bool {
 	cluster.lock.Lock()
 	defer cluster.lock.Unlock()
-	// 新的主节点任期，小于我的任期
+
 	if newLeaderNode.getTerm() < cluster.GetMyTerm() {
 		return false
 	}
-	// 新的主节点的任期，小于当前主节点的任期
+
 	if cluster.nodeLeader != nil && newLeaderNode.getTerm() < cluster.nodeLeader.getTerm() {
 		return false
 	}
-	// 主节点未变化
+
 	if cluster.nodeLeader != nil && cluster.nodeLeader.GetId() == newLeaderNode.GetId() {
 		return true
 	}
 	cluster.nodeLeader = newLeaderNode
 	if cluster.GetMyNode().GetId() == newLeaderNode.GetId() {
-		cluster.logger.Info("[Cluster Service] [ready] (term=%d) ============ I'am leader node ============", newLeaderNode.getTerm())
+		cluster.logger.Info("current term:%d, current node [%s] is leader", newLeaderNode.getTerm(), newLeaderNode.GetId)
 		cluster.status = statusLeader
 		go cluster.createEvent("SignLeader")
 	} else {
-		cluster.logger.Info("[Cluster Service] [ready] (term=%d) ============ I'am slave node. leader is %s ============", newLeaderNode.getTerm(), newLeaderNode.GetId())
+		cluster.logger.Info("current term:%d, current node is slave node. leader is %", newLeaderNode.getTerm(), newLeaderNode.GetId())
 		cluster.status = statusFollower
 		go cluster.createEvent("SignFollower")
 	}

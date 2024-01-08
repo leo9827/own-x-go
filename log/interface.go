@@ -12,6 +12,12 @@ const (
 	LevelTrace
 )
 
+type level string
+
+const (
+	DebugLevel level = "debug"
+)
+
 type Logger interface {
 	Trace(format string, v ...interface{})
 

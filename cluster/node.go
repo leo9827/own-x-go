@@ -3,8 +3,44 @@ package cluster
 import (
 	"errors"
 	"fmt"
+	"ownx/nio"
+	"sync"
 	"time"
 )
+
+type Node struct {
+	voteLock      sync.Mutex
+	term          int
+	id            string
+	name          string
+	voteCount     map[int]int
+	voteNode      map[int]string
+	ip            string
+	port          int
+	nodeConnector *nio.SocketConnector
+	hbTime        time.Time
+}
+
+type NodeConf struct {
+	Name string
+	Ip   string
+	Port int
+}
+
+type NodeMsg struct {
+	NodeId   string
+	Term     int
+	LeaderId string `json:",omitempty"`
+	ReqId    string `json:",omitempty"`
+	Success  *bool  `json:",omitempty"`
+	Flag     string `json:",omitempty"`
+}
+
+type NodeService interface {
+	GetId() string
+	GetName() string
+	SendMessage(flag uint8, data interface{}) error
+}
 
 func (n *Node) SendMessage(flag uint8, data interface{}) error {
 	if n.nodeConnector == nil {

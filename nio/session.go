@@ -7,12 +7,12 @@ import (
 
 type Session struct {
 	id         int64
-	codec      Codec
-	connection net.Conn
-	attribute  map[string]interface{} // local attributes
 	isClient   bool
+	attribute  map[string]interface{} // local attributes
+	codec      Codec
 	acceptor   *SocketAcceptor
 	connector  *SocketConnector
+	connection net.Conn
 }
 
 func (session *Session) GetSessionId() int64 {
