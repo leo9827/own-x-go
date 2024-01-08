@@ -1,7 +1,7 @@
 package cluster
 
 import (
-	"ownx/env"
+	"ownx/cluster/env"
 	"ownx/log"
 	"ownx/nio"
 	"sync"
