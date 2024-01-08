@@ -23,9 +23,9 @@ func init() {
 
 type task struct {
 	ctx context.Context
-	f   func()
+	f   func() // task content
 
-	next *task
+	next *task // task is a queue
 }
 
 func (t *task) zero() {

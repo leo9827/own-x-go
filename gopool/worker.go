@@ -49,7 +49,7 @@ func (w *worker) run() {
 						}
 					}
 				}()
-				t.f()
+				t.f() // task run
 			}()
 			t.Recycle()
 		}
