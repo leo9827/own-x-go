@@ -1,6 +1,8 @@
 # own-x-go
 
-project director explain:    
+*personal own x framework for building*
+
+project director explain:
 
 | directory    | feature                                   |
 |--------------|-------------------------------------------|
@@ -10,4 +12,4 @@ project director explain:
 | concurrency  | go concurrency tests and custom framework |
 | nio          | async io  using tcp / socket              |
 | ssh          | ssh client                                |
-| timing_wheel | timing wheel implmentation                |
+| timing_wheel | timing wheel implementation               |
