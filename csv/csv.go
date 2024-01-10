@@ -2,6 +2,7 @@ package csv
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"os"
 	"strconv"
@@ -26,9 +27,9 @@ func Create(spec *Spec) error {
 		return err
 	}
 	defer file.Close()
-	csvw := csv.NewWriter(file)
+	csvWriter := csv.NewWriter(file)
 	if len(spec.Titles) > 0 {
-		err = csvw.Write(spec.Titles)
+		err = csvWriter.Write(spec.Titles)
 		if err != nil {
 			return err
 		}
@@ -42,12 +43,12 @@ func Create(spec *Spec) error {
 			}
 			data = append(data, row)
 		}
-		err = csvw.WriteAll(data)
+		err = csvWriter.WriteAll(data)
 		if err != nil {
 			return err
 		}
 	}
-	csvw.Flush()
+	csvWriter.Flush()
 	return nil
 }
 
@@ -65,8 +66,18 @@ func toString(v interface{}) string {
 		} else {
 			return "false"
 		}
-	//其他类型需要自行处理
-	default:
+	case []interface{}:
+		// 数组类型
+		b, _ := json.Marshal(t)
+		return string(b)
+	case map[string]interface{}:
+		// map类型
+		b, _ := json.Marshal(t)
+		return string(b)
+	case nil:
 		return ""
+	default:
+		b, _ := json.Marshal(t)
+		return string(b)
 	}
 }
