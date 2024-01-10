@@ -24,6 +24,42 @@ func TestWaitGroup(t *testing.T) {
 	wg.Wait()
 }
 
+func TestWaitGroup2(t *testing.T) {
+	type Example struct {
+		Name string
+		IntF int
+		ArrF []string
+	}
+	var (
+		wg       sync.WaitGroup
+		example  Example
+		example2 *Example
+		intv     int
+		str      string
+	)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		example = Example{
+			Name: "this name is assign in goroutine",
+		}
+		example2 = &Example{
+			Name: "this ptr is assign in goroutine",
+		}
+		intv = 111
+		str = "str111"
+	}()
+	go func(example3 *Example) {
+		defer wg.Done()
+		example3.Name = "this is pass value in param"
+	}(&example)
+	wg.Wait()
+	t.Logf("after wg, %v\n", example)
+	t.Logf("after wg, %v\n", example2)
+	t.Logf("after wg, %v\n", intv)
+	t.Logf("after wg, %v\n", str)
+}
+
 func TestClose(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	for _, salutation := range []string{"hello", "greetings", "good day"} {
