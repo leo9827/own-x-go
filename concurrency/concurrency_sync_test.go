@@ -36,13 +36,17 @@ func TestWaitGroup2(t *testing.T) {
 		example2 *Example
 		intv     int
 		str      string
+		mu       sync.Mutex
 	)
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
+		mu.Lock()
+		fmt.Println("goroutine 1 locked")
 		example = Example{
 			Name: "this name is assign in goroutine",
 		}
+		mu.Unlock()
 		example2 = &Example{
 			Name: "this ptr is assign in goroutine",
 		}
@@ -51,13 +55,17 @@ func TestWaitGroup2(t *testing.T) {
 	}()
 	go func(example3 *Example) {
 		defer wg.Done()
+		//time.Sleep(time.Millisecond)
+		mu.Lock()
+		fmt.Println("goroutine 2 locked")
 		example3.Name = "this is pass value in param"
+		mu.Unlock()
 	}(&example)
 	wg.Wait()
-	t.Logf("after wg, %v\n", example)
-	t.Logf("after wg, %v\n", example2)
-	t.Logf("after wg, %v\n", intv)
-	t.Logf("after wg, %v\n", str)
+	fmt.Printf("after wg, example is: %v\n", example.Name)
+	fmt.Printf("after wg, example2 is: %v\n", example2)
+	fmt.Printf("after wg, intv is: %v\n", intv)
+	fmt.Printf("after wg, str is: %v\n", str)
 }
 
 func TestClose(t *testing.T) {
