@@ -240,9 +240,9 @@ func (cluster *Cluster) fightElection() {
 		return
 	}
 
-	cluster.fightingLock.Lock()
+	cluster.fightingMu.Lock()
 	if cluster.fighting {
-		cluster.fightingLock.Unlock()
+		cluster.fightingMu.Unlock()
 		return
 	}
 
@@ -251,7 +251,7 @@ func (cluster *Cluster) fightElection() {
 		cluster.fighting = false
 	}()
 
-	cluster.fightingLock.Unlock()
+	cluster.fightingMu.Unlock()
 
 	currentTerm := cluster.nodeMy.getTerm()
 

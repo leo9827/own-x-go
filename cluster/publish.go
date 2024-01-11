@@ -10,12 +10,12 @@ type JobInfo struct {
 }
 
 func (cluster *Cluster) RegisterFunc(taskName string, f func(data interface{})) error {
-	cluster.lock.Lock()
-	defer cluster.lock.Unlock()
+	cluster.mu.Lock()
+	defer cluster.mu.Unlock()
 	if taskName == "" {
 		return errors.New("RegisterFunc TaskName is nil")
 	} else {
-		cluster.taskTracker[taskName] = f
+		cluster.taskRegistry[taskName] = f
 	}
 	return nil
 }
@@ -50,13 +50,13 @@ func (cluster *Cluster) PublishJob(jobName string, jobList map[string]interface{
 
 func (cluster *Cluster) pushTask(jobName string, data interface{}) {
 
-	f := cluster.taskTracker[jobName]
+	f := cluster.taskRegistry[jobName]
 	if f != nil {
 		go func() {
 			defer OnError("[panic] Push task")
 			f(data)
 		}()
 	} else {
-		cluster.logger.Error("Push task failed. Cause of job[%s] didn't set taskTracker func.", jobName)
+		cluster.logger.Error("Push task failed. Cause of job[%s] didn't set taskRegistry func.", jobName)
 	}
 }

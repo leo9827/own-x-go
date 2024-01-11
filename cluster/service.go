@@ -12,26 +12,26 @@ var DefaultCluster *Cluster
 
 type Cluster struct {
 	logger          log.Logger
-	lock            sync.Mutex
-	fightingLock    sync.Mutex
 	configure       *Conf
+	mu              sync.Mutex
+	fighting        bool
+	fightingMu      sync.Mutex
 	nodesAll        *sync.Map
 	nodesAlive      *sync.Map
+	nodeMy          *Node
 	nodeLeader      *Node
 	lostLeaderTime  time.Time
-	nodeMy          *Node
 	status          stat
-	fighting        bool
 	sendAndWaitChan chan *NodeMsg
 	serviceAcceptor *nio.SocketAcceptor
-	taskTracker     map[string]func(data interface{})
+	taskRegistry    map[string]func(data interface{})
 	events          chan event
 	closeOnce       sync.Once
 }
 
 type Conf struct {
 	Model       string
-	NodeTimeout int64 `yaml:"node_timeout"`
+	NodeTimeout int64 `json:"node_timeout" yaml:"node_timeout"`
 	Nodes       []*NodeConf
 }
 
@@ -76,7 +76,7 @@ func Create(clusterConfig *Conf, logger log.Logger) *Cluster {
 		configure:      clusterConfig,
 		nodesAll:       &sync.Map{},
 		nodesAlive:     &sync.Map{},
-		taskTracker:    make(map[string]func(data interface{})),
+		taskRegistry:   make(map[string]func(data interface{})),
 		lostLeaderTime: time.Now(),
 		events:         make(chan event, 20),
 	}
@@ -113,13 +113,13 @@ func (cluster *Cluster) StartUp() {
 		return
 	}
 
-	cluster.lock.Lock()
+	cluster.mu.Lock()
 	if cluster.status > 0 {
-		cluster.lock.Unlock()
+		cluster.mu.Unlock()
 		return
 	}
 	cluster.status = statusFollower
-	cluster.lock.Unlock()
+	cluster.mu.Unlock()
 
 	cluster.openService()
 }
@@ -388,8 +388,8 @@ func (cluster *Cluster) findMyNode() {
 }
 
 func (cluster *Cluster) signLeader(newLeaderNode *Node) bool {
-	cluster.lock.Lock()
-	defer cluster.lock.Unlock()
+	cluster.mu.Lock()
+	defer cluster.mu.Unlock()
 
 	if newLeaderNode.getTerm() < cluster.GetMyTerm() {
 		return false
