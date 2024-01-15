@@ -3,23 +3,34 @@ package monitor
 import (
 	"fmt"
 	"sync"
+	"time"
 )
 
 type Scheduler struct {
-	mu        sync.Mutex
-	done      chan interface{}
-	round     int
-	roundDone chan interface{}
-	roundCall map[string]func(round int)
+	name          string
+	mu            sync.Mutex
+	done          chan interface{}
+	round         int64
+	roundDoneFlag bool
+	roundDone     chan interface{}
+	roundCall     map[string]func(round int64)
 }
 
-func NewScheduler() *Scheduler {
+func newScheduler(name string) *Scheduler { // init keep private
 	return &Scheduler{
+		name:      name,
 		mu:        sync.Mutex{},
 		done:      make(chan interface{}),
-		roundDone: make(chan interface{}),
-		round:     0,
+		roundDone: make(chan interface{}, 1), // default len is 1 for start
+		round:     time.Now().Unix(),         // using timestamp for round
+		roundCall: make(map[string]func(round int64)),
 	}
+}
+
+var DefaultMonitorScheduler = newScheduler("DefaultMonitorScheduler")
+
+func (s *Scheduler) Name() string {
+	return s.name
 }
 
 func (s *Scheduler) Start() {
@@ -27,22 +38,50 @@ func (s *Scheduler) Start() {
 		fmt.Println("prevCheck error ", e)
 		return
 	}
+
 	for {
 		select {
-		case <-s.roundDone:
-			s.startNewRound()
 		case <-s.done:
+			fmt.Println("Scheduler ", s.name, " is shutting down")
 			return
+		default:
 		}
 	}
 }
 
-func (s *Scheduler) RoundDone() {
+func (s *Scheduler) MasterCall() {
+	for {
+		select {
+		case <-s.roundDone:
+			s.startNewRound()
+		default:
+		}
+	}
+}
+
+func (s *Scheduler) SlaveCall() {
+	fmt.Println("SlaveCall is not implement")
+}
+
+func (s *Scheduler) Waitting() {
+	fmt.Println("Waitting is not implement")
+}
+
+func (s *Scheduler) Stop() {
+	fmt.Println("Stop is not implement")
+}
+
+func (s *Scheduler) RoundDone(round int64) {
 	if e := s.prevCheck(); e != nil {
 		fmt.Println("prevCheck error ", e)
 		return
 	}
-	s.roundDone <- struct{}{}
+	s.mu.Lock()
+	if !s.roundDoneFlag && round == s.round {
+		s.roundDoneFlag = true
+		s.roundDone <- struct{}{}
+	}
+	s.mu.Unlock()
 }
 
 func (s *Scheduler) startNewRound() {
@@ -51,7 +90,7 @@ func (s *Scheduler) startNewRound() {
 		return
 	}
 	s.mu.Lock()
-	s.round++
+	s.round = time.Now().Unix()
 	s.mu.Unlock()
 	for name, f := range s.roundCall {
 		fmt.Println("call ", name, ", round: ", s.round)
@@ -59,7 +98,7 @@ func (s *Scheduler) startNewRound() {
 	}
 }
 
-func (s *Scheduler) CallRegistry(name string, call func(round int)) {
+func (s *Scheduler) RoundCallRegistry(name string, call func(round int64)) {
 	if e := s.prevCheck(); e != nil {
 		fmt.Println("prevCheck error ", e)
 		return

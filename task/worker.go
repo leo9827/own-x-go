@@ -78,7 +78,7 @@ func (w *Worker) Done() {
 	}
 }
 
-func (w *Worker) Recv(list []*Task) {
+func (w *Worker) Put(list []*Task) {
 	for _, t := range list {
 		pos := t.ID % int64(len(w.buckets))
 		w.buckets[pos] <- t
