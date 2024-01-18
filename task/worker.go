@@ -11,16 +11,13 @@ type Worker struct {
 	done        chan interface{}
 }
 
-var defaultWorker *Worker
+var DefaultWorker *Worker
 
 func init() {
-	defaultWorker = NewWorker(1024)
-	defaultWorker.Start()
-	//interrupt := termination.New(nil, defaultWorker.Done, func() {})
-	//inErr := interrupt.Run(func() error {
-	//	return nil
-	//})
-	//fmt.Println(inErr)
+	parallel := 1
+	DefaultWorker = NewWorker(parallel) // todo resize
+	DefaultWorker.Start()
+	fmt.Printf("monitor-worker start with %d goroutines \n", parallel*2)
 }
 
 func NewWorker(parallelism int) *Worker {
@@ -42,16 +39,16 @@ func (w *Worker) Start() {
 	exec := func(index int) {
 		defer func() {
 			if fatal := recover(); fatal != nil {
-				fmt.Println(index, " is panic! recover : ", fatal)
+				fmt.Println("monitor-worker id: ", index, " is panic! recover : ", fatal)
 			}
 		}()
-		fmt.Println(index, " is start running")
+		fmt.Println("monitor-worker id: ", index, " is start running")
 		for {
 			select {
 			case task := <-w.buckets[index]:
 				recvt := time.Now()
 
-				fmt.Println(index, " is start exec task")
+				fmt.Println("monitor-worker id: ", index, " is start exec task")
 				err := task.F(task.Data)
 				if err != nil {
 					if task.NeedRetry && task.RetryTimes < task.RetryLimit {
@@ -59,9 +56,9 @@ func (w *Worker) Start() {
 						w.buckets[index] <- task
 					}
 				}
-				fmt.Println(index, " is finished task, time elapsed ns: ", time.Since(recvt).Microseconds())
+				fmt.Println("monitor-worker id: ", index, " is finished task, time elapsed ns: ", time.Since(recvt).Microseconds())
 			case <-w.done:
-				fmt.Println(index, " is getting done")
+				fmt.Println("monitor-worker id: ", index, " is getting done")
 				return
 			}
 		}
@@ -69,6 +66,7 @@ func (w *Worker) Start() {
 	for i := 0; i < len(w.buckets); i++ {
 		index := i
 		go exec(index) // 1 goroutine for 1 bucket, could add more goroutine to handle 1 bucket
+		go exec(index) // 2 goroutine for 1 bucket, handle for 1 goroutines timeout or hold too long
 	}
 }
 
