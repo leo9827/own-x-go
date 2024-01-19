@@ -1,4 +1,4 @@
-package monitor
+package task
 
 type Executor interface {
 	Exec(data interface{}) error

@@ -1,4 +1,4 @@
-package monitor
+package task
 
 type Task struct {
 	ID         int64
@@ -7,11 +7,4 @@ type Task struct {
 	NeedRetry  bool
 	RetryTimes int
 	RetryLimit int
-}
-
-func NewTask(f func(data interface{}) error, data interface{}) *Task {
-	return &Task{
-		F:    f,
-		Data: data,
-	}
 }

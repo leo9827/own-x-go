@@ -1,4 +1,4 @@
-package monitor
+package task
 
 type Allocator interface {
 	StartAlloc(round int64)
