@@ -132,10 +132,8 @@ func TestSelect1(t *testing.T) {
 	}()
 
 	fmt.Println("Blocking on read...")
-	select {
-	case <-c:
-		fmt.Printf("Unblocked %v later.\n", time.Since(start))
-	}
+	<-c
+	fmt.Printf("Unblocked %v later.\n", time.Since(start))
 }
 
 func TestSelect2(t *testing.T) {

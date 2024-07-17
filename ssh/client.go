@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/pkg/sftp"
-	"golang.org/x/crypto/ssh"
 	"io"
 	"log"
 	"net"
@@ -13,6 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/pkg/sftp"
+	"golang.org/x/crypto/ssh"
 )
 
 var Ciphers = []string{
@@ -101,7 +102,10 @@ func (c *Cmd) Connect() (*Cmd, error) {
 
 func (c *Cmd) Close() {
 	if c.client != nil {
-		c.client.Close()
+		err := c.client.Close()
+		if err != nil {
+			return
+		}
 		c.client = nil
 	}
 }
@@ -140,7 +144,12 @@ func (c *Cmd) RunCmdWithEnv(command string, envs map[string]string, mustEnv bool
 	if err1 != nil {
 		return &Result{command: command, err: fmt.Errorf("new session failed. " + err1.Error())}
 	}
-	defer session.Close()
+	defer func(session *ssh.Session) {
+		err := session.Close()
+		if err != nil {
+			logger.Printf("close session failed. %v", err)
+		}
+	}(session)
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
@@ -186,7 +195,12 @@ func (c *Cmd) RunCmd(command string) *Result {
 	if err1 != nil {
 		return &Result{command: command, err: fmt.Errorf("new session failed. " + err1.Error())}
 	}
-	defer session.Close()
+	defer func(session *ssh.Session) {
+		err := session.Close()
+		if err != nil {
+			logger.Printf("close session failed. %v", err)
+		}
+	}(session)
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	session.Stdout = stdout
@@ -226,7 +240,12 @@ func (c *Cmd) PutData(data interface{}, file string, fileMode os.FileMode) (n in
 	if err != nil {
 		return 0, fmt.Errorf("sftp client open file %s error: %w", file, err)
 	}
-	defer target.Close()
+	defer func(target *sftp.File) {
+		err := target.Close()
+		if err != nil {
+			logger.Printf("close file %v failed. %v", target, err)
+		}
+	}(target)
 
 	// chmod
 	if fileMode != 0 {
@@ -286,8 +305,8 @@ func (c *Cmd) putFile(localPath, remotePath string, sftpClient *sftp.Client) err
 		}
 		targetDir := filepath.Join(remotePath, stat.Name())
 		logger.Printf("remote mkdir [%s %s]", stat.Mode(), targetDir)
-		sftpClient.MkdirAll(targetDir)
-		sftpClient.Chmod(targetDir, stat.Mode())
+		_ = sftpClient.MkdirAll(targetDir)
+		_ = sftpClient.Chmod(targetDir, stat.Mode())
 		for _, file := range files {
 			if err := c.putFile(filepath.Join(localPath, file.Name()), targetDir, sftpClient); err != nil {
 				return err
@@ -311,7 +330,12 @@ func (c *Cmd) putFile(localPath, remotePath string, sftpClient *sftp.Client) err
 	if err != nil {
 		return fmt.Errorf("sftp client open remote file %s error: %w", file, err)
 	}
-	defer target.Close()
+	defer func(target *sftp.File) {
+		err := target.Close()
+		if err != nil {
+			logger.Printf("close remote file %v failed. %v", target, err)
+		}
+	}(target)
 
 	logger.Printf("remote create file [%s %s]", stat.Mode(), file)
 
@@ -356,7 +380,12 @@ func (c *Cmd) getFile(
 	if err != nil {
 		return fmt.Errorf("sftp client open remote file %s error: %w", remoteFile, err)
 	}
-	defer sourceFile.Close()
+	defer func(sourceFile *sftp.File) {
+		err := sourceFile.Close()
+		if err != nil {
+			logger.Printf("close remote file %v failed. %v", sourceFile, err)
+		}
+	}(sourceFile)
 
 	stat, err := sourceFile.Stat()
 	if err != nil {

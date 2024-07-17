@@ -53,7 +53,10 @@ func (socket *SocketConnector) Connect() error {
 
 	if sessionId, syncErr := socket.syncSessionId(); syncErr != nil {
 		log.Printf(" %s Sync Session Id failed. Cause of %s\n", socket.addr, syncErr.Error())
-		connection.Close()
+		err := connection.Close()
+		if err != nil {
+			log.Printf(" %s Close connection failed. Cause of %s\n", socket.addr, err.Error())
+		}
 		return syncErr
 	} else {
 		session.id = sessionId

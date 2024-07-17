@@ -21,16 +21,14 @@ func (cluster *Cluster) updateMetrics() {
 		ip := cluster.GetMyNode().GetHost()
 		isReady := cluster.IsReady()
 		IsLeader := cluster.IsLeader()
-		switch isReady {
-		case false:
-			clusterStatusGauge.WithLabelValues(ip).Set(-1)
-		case true:
-			switch IsLeader {
-			case false:
-				clusterStatusGauge.WithLabelValues(ip).Set(0)
-			case true:
+		if isReady {
+			if IsLeader {
 				clusterStatusGauge.WithLabelValues(ip).Set(1)
+			} else {
+				clusterStatusGauge.WithLabelValues(ip).Set(0)
 			}
+		} else {
+			clusterStatusGauge.WithLabelValues(ip).Set(-1)
 		}
 	}
 }

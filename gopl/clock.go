@@ -7,7 +7,9 @@ import (
 	"time"
 )
 
-func main() {
+type Clock struct{}
+
+func (c *Clock) Start() {
 
 	listener, err := net.Listen("tcp", ":8080")
 	if err != nil {
@@ -20,16 +22,16 @@ func main() {
 			log.Print(err)
 			continue
 		}
-		go handle(conn) // handle connections concurrently
+		go c.handle(conn) // handle connections concurrently
 	}
 
 }
 
-func handle(c net.Conn) {
-	defer c.Close()
+func (c *Clock) handle(conn net.Conn) {
+	defer conn.Close()
 
 	for {
-		_, err := io.WriteString(c, time.Now().Format("15:04:05\n"))
+		_, err := io.WriteString(conn, time.Now().Format("15:04:05\n"))
 		if err != nil {
 			return
 		}

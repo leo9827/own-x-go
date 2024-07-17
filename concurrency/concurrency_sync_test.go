@@ -72,10 +72,10 @@ func TestClose(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	for _, salutation := range []string{"hello", "greetings", "good day"} {
 		wg.Add(1)
-		go func() {
+		go func(s string) {
 			defer wg.Done()
-			fmt.Println(salutation) // not in closure
-		}()
+			fmt.Println(s) // not in closure
+		}(salutation)
 	}
 	wg.Wait()
 
@@ -184,8 +184,8 @@ func TestMutex2(t *testing.T) {
 		defer wg.Done()
 		for i := 0; i < 5; i++ {
 			l.Lock()
-			l.Unlock()
-			time.Sleep(1)
+			defer l.Unlock()
+			time.Sleep(1 * time.Second)
 		}
 	}
 

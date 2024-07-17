@@ -41,7 +41,7 @@ func (a *Allocator) StartAlloc(round int64) {
 
 	fmt.Printf("%s StartAlloc, round: %d", a.Name, round)
 	if err := a.prevCheck(); err != nil {
-		fmt.Printf("%s StartAlloc: should init and inject require fields before start, err: ",
+		fmt.Printf("%s StartAlloc: should init and inject require fields before start, err: %v",
 			a.Name, err)
 		return
 	}

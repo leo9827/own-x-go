@@ -2,7 +2,9 @@ package main
 
 import "fmt"
 
-func main() {
+type Pipeline struct{}
+
+func (p *Pipeline) Start() {
 	natural := make(chan int)
 	square := make(chan int)
 

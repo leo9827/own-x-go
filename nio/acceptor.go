@@ -90,7 +90,10 @@ func (socket *SocketAcceptor) handlerConnection() {
 
 		if sendErr := socket.sendSessionId(connection, session.id); sendErr != nil {
 			session.id = atomic.AddInt64(&sessionId, -1)
-			connection.Close()
+			err := connection.Close()
+			if err != nil {
+				log.Printf("[server] [%s] Close socket connection error. %s", socket.addr, err.Error())
+			}
 			continue
 		}
 		log.Printf("[server] [%s] [%d] Accept connection from remote %s",
@@ -176,7 +179,10 @@ func (socket *SocketAcceptor) sendSessionId(connection net.Conn, sessionId int64
 	defer OnError("Send Session Id")
 	time.Sleep(5 * time.Millisecond)
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.BigEndian, sessionId)
+	err := binary.Write(buf, binary.BigEndian, sessionId)
+	if err != nil {
+		log.Printf("Write session id error. %s", err.Error())
+	}
 	if _, ioErr := connection.Write(buf.Bytes()); ioErr != nil {
 		return ioErr
 	}

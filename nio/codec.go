@@ -73,7 +73,7 @@ func (c *defaultCodec) Encode(msg *Msg) *bytes.Buffer {
 	}
 	binary.Write(buf, binary.BigEndian, msg.length)
 	binary.Write(buf, binary.BigEndian, msg.flag)
-	if bodyBytes != nil && len(bodyBytes) > 0 {
+	if len(bodyBytes) > 0 {
 		buf.Write(bodyBytes)
 	}
 	return buf
@@ -112,7 +112,7 @@ func (c *defaultCodec) Decode(msg *Msg, reader *bytes.Buffer) bool {
 }
 
 func Gzip(data []byte) ([]byte, error) {
-	if data == nil || len(data) == 0 {
+	if len(data) == 0 {
 		return []byte{}, nil
 	}
 	var b bytes.Buffer
@@ -131,7 +131,7 @@ func Gzip(data []byte) ([]byte, error) {
 }
 
 func UnGzip(data []byte) ([]byte, error) {
-	if data == nil || len(data) == 0 {
+	if len(data) == 0 {
 		return []byte{}, nil
 	}
 	reader, err := gzip.NewReader(bytes.NewReader(data))

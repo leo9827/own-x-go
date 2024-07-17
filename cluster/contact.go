@@ -418,7 +418,10 @@ func (cluster *Cluster) genServiceAcceptorHandler() *nio.Handler {
 				leaderTerm = leaderNode.getTerm()
 			}
 
-			session.Write(msgRAskLeader, &NodeMsg{NodeId: cluster.GetMyId(), Term: leaderTerm, ReqId: nodeMsg.ReqId, LeaderId: leaderId})
+			err := session.Write(msgRAskLeader, &NodeMsg{NodeId: cluster.GetMyId(), Term: leaderTerm, ReqId: nodeMsg.ReqId, LeaderId: leaderId})
+			if err != nil {
+				cluster.logger.Error("Server response ask leader error. %s", err)
+			}
 
 			if cluster.IsFighting() || cluster.GetLeaderNode() == nil {
 				cluster.logger.Info("term:%d, ask msg: %s, answer leaderId=%s", cluster.GetMyTerm(), ToJson(nodeMsg), leaderId)
@@ -432,7 +435,10 @@ func (cluster *Cluster) genServiceAcceptorHandler() *nio.Handler {
 
 			chooseYou := cluster.GetMyNode().voteToNode(nodeMsg.Term, nodeMsg.NodeId)
 
-			session.Write(msgRGetVote, &NodeMsg{NodeId: cluster.GetMyId(), Term: nodeMsg.Term, ReqId: nodeMsg.ReqId, Success: &chooseYou})
+			err := session.Write(msgRGetVote, &NodeMsg{NodeId: cluster.GetMyId(), Term: nodeMsg.Term, ReqId: nodeMsg.ReqId, Success: &chooseYou})
+			if err != nil {
+				cluster.logger.Error("Server response get vote error. %s", err)
+			}
 
 			if cluster.IsFighting() || cluster.GetLeaderNode() == nil {
 				cluster.logger.Info("term:%d, get vote: %s, answer chooseYou=%t", cluster.GetMyTerm(), ToJson(nodeMsg), chooseYou)
@@ -442,7 +448,10 @@ func (cluster *Cluster) genServiceAcceptorHandler() *nio.Handler {
 
 			if nodeMsg.Term < cluster.GetMyTerm() {
 				success := false
-				session.Write(msgRLeader, &NodeMsg{NodeId: cluster.GetMyId(), Term: cluster.GetMyTerm(), ReqId: nodeMsg.ReqId, Success: &success})
+				err := session.Write(msgRLeader, &NodeMsg{NodeId: cluster.GetMyId(), Term: cluster.GetMyTerm(), ReqId: nodeMsg.ReqId, Success: &success})
+				if err != nil {
+					cluster.logger.Error("Server response broadcast leader error. %s", err)
+				}
 				cluster.logger.Info("term:%d, broadcast:%s，reject Leader.", cluster.GetMyTerm(), ToJson(nodeMsg))
 				return
 			}
@@ -466,14 +475,20 @@ func (cluster *Cluster) genServiceAcceptorHandler() *nio.Handler {
 				cacheNode.updateHbTime()
 			}
 
-			session.Write(msgOk, &NodeMsg{NodeId: cluster.GetMyId(), Term: cluster.GetMyTerm()})
+			err := session.Write(msgOk, &NodeMsg{NodeId: cluster.GetMyId(), Term: cluster.GetMyTerm()})
+			if err != nil {
+				cluster.logger.Error("Server response broadcast leader error. %s", err)
+			}
 
 			if cluster.GetLeaderNode() != nil {
 				if cluster.GetLeaderNode().GetId() == nodeMsg.LeaderId && cluster.GetLeaderNode().getTerm() == nodeMsg.Term {
 
 					if nodeMsg.Flag == "1" {
 						success := true
-						session.Write(msgRLeader, &NodeMsg{NodeId: cluster.GetMyId(), Term: cluster.GetMyTerm(), ReqId: nodeMsg.ReqId, Success: &success})
+						err := session.Write(msgRLeader, &NodeMsg{NodeId: cluster.GetMyId(), Term: cluster.GetMyTerm(), ReqId: nodeMsg.ReqId, Success: &success})
+						if err != nil {
+							cluster.logger.Error("Server response broadcast leader error. %s", err)
+						}
 					}
 					return
 				}
@@ -482,7 +497,10 @@ func (cluster *Cluster) genServiceAcceptorHandler() *nio.Handler {
 			if value, ok := cluster.nodesAll.Load(nodeMsg.LeaderId); ok {
 				leaderNode := value.(*Node)
 				success := cluster.signLeader(leaderNode)
-				session.Write(msgRLeader, &NodeMsg{NodeId: cluster.GetMyId(), Term: cluster.GetMyTerm(), ReqId: nodeMsg.ReqId, Success: &success})
+				err := session.Write(msgRLeader, &NodeMsg{NodeId: cluster.GetMyId(), Term: cluster.GetMyTerm(), ReqId: nodeMsg.ReqId, Success: &success})
+				if err != nil {
+					cluster.logger.Error("Server response broadcast leader error. %s", err)
+				}
 
 				cluster.logger.Info("term:%d broadcast: %s、answer Success=%t", cluster.GetMyTerm(), ToJson(nodeMsg), success)
 			}

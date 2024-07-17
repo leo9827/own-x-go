@@ -6,7 +6,9 @@ import (
 	"time"
 )
 
-func main() {
+type Select struct{}
+
+func (s *Select) Start() {
 	ch := make(chan int, 1)
 	for i := 0; i < 10; i++ {
 		select {
@@ -18,7 +20,7 @@ func main() {
 	}
 }
 
-func runLaunch() {
+func (s *Select) runLaunch() {
 	fmt.Println("Commencing countdown.")
 	tick := time.Tick(1 * time.Second)
 	for countdown := 10; countdown > 0; countdown-- {
@@ -41,9 +43,9 @@ func runLaunch() {
 		fmt.Println("Launch aborted!")
 		return
 	}
-	launch()
+	s.launch()
 }
 
-func launch() {
+func (s *Select) launch() {
 	fmt.Println("Lift off!")
 }
