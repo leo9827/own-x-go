@@ -1,6 +1,6 @@
 module ownx
 
-go 1.21.1
+go 1.19
 
 require (
 	github.com/pkg/sftp v1.13.6
@@ -8,6 +8,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/crypto v0.17.0
+	golang.org/x/text v0.14.0
 )
 
 require (

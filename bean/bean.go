@@ -2,10 +2,15 @@ package bean
 
 import (
 	"fmt"
+	"ownx/basic"
+	"ownx/tools"
 	"reflect"
 	"regexp"
 	"strings"
 	"sync"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // bean对象管理
@@ -71,7 +76,7 @@ func findAndSet(beanName string, beanInterface interface{}) {
 		}
 
 		// 如果没有autowrite标签，忽略
-		if isAutowrite(string(fieldType.Tag)) == false {
+		if !isAutowrite(string(fieldType.Tag)) {
 			continue
 		}
 
@@ -81,12 +86,12 @@ func findAndSet(beanName string, beanInterface interface{}) {
 		}
 
 		// 如果字段值不是空的，忽略
-		if field.IsNil() == false {
+		if !field.IsNil() {
 			continue
 		}
 
 		// 如果字段不可设置，错误
-		if field.CanSet() == false {
+		if !field.CanSet() {
 			panic(fmt.Sprintf("ioc autowrite fail. field can not set. Bean=%s DependentBean=%s.", beanName, fieldType.Name))
 		}
 
@@ -115,7 +120,8 @@ func findAndSet(beanName string, beanInterface interface{}) {
 
 		// 4. 如果是接口类型，会出现类名与接口名不一致的情况，将Bean名称修正为真实类的名称，偿试使用package.InterfaceName
 		if propBean == nil && field.Kind() == reflect.Interface {
-			dependentBeanName = tools.Replace(fieldType.Type.String(), fieldType.Type.Name(), fieldType.Name) // 将接口的名字替换为变量的名字，如定义："UserServiceImpl api.UserService"，得到的结果为 api.UserServiceImpl
+			// 将接口的名字替换为变量的名字，如定义："UserServiceImpl api.UserService"，得到的结果为 api.UserServiceImpl
+			dependentBeanName = tools.Replace(fieldType.Type.String(), fieldType.Type.Name(), fieldType.Name)
 			propBean = GetBean(dependentBeanName)
 		}
 
@@ -138,14 +144,13 @@ func isAutowrite(tag string) bool {
 
 // 设置指定名称的Bean
 func SetBean(beanName string, bean interface{}) {
-	if strings.Index(beanName, ".") < 0 {
-		beanName = strings.Title(beanName)
+	if !strings.Contains(beanName, ".") {
+		beanName = cases.Title(language.Und).String(beanName)
 	}
 	beanContext.mu.Lock()
 	defer beanContext.mu.Unlock()
 	if beanContext.m[beanName] != nil {
 		panic(fmt.Sprintf("add bean fail. bean %s already exists.", beanName))
-		return
 	}
 	beanContext.m[beanName] = bean
 }
@@ -158,7 +163,7 @@ func AddBean(bean interface{}) {
 	}
 	beanName := basic.GetClassName(bean)
 	part := strings.Split(beanName, ".")
-	beanName = part[0] + "." + strings.Title(part[1])
+	beanName = part[0] + "." + cases.Title(language.Und).String(part[1])
 	SetBean(beanName, bean)
 }
 

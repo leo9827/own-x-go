@@ -145,3 +145,6 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
+
+# ignore
+vec/data/glove.6B.50d.txt
