@@ -1,6 +1,7 @@
 package log
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -12,8 +13,8 @@ import (
 )
 
 type LoggerImpl struct {
-	mu     sync.Mutex
-	stdout *logrus.Logger
+	mu sync.Mutex
+	l  *logrus.Logger
 }
 
 var DefaultLogger *LoggerImpl
@@ -21,7 +22,7 @@ var defaultLoggerInit sync.Once
 
 func New() *LoggerImpl {
 	l := &LoggerImpl{
-		stdout: logrus.New(),
+		l: logrus.New(),
 	}
 	l.SetLevel(string(DebugLevel))
 	if DefaultLogger == nil {
@@ -42,9 +43,9 @@ func (l *LoggerImpl) decorate(skip int) *logrus.Entry {
 		} else {
 			position = fmt.Sprintf("%s:%d", strings.Join(path, string(os.PathSeparator)), line)
 		}
-		return l.stdout.WithField("position", position).WithField("func", fName)
+		return l.l.WithField("position", position).WithField("func", fName)
 	} else {
-		return logrus.NewEntry(l.stdout)
+		return logrus.NewEntry(l.l)
 	}
 }
 
@@ -76,33 +77,10 @@ func (l *LoggerImpl) Panic(format string, v ...interface{}) {
 	l.decorate(2).Panicf(format, v...)
 }
 
-func (l *LoggerImpl) SetOutput(out io.Writer) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.stdout.Out = out
-}
-
-func (l *LoggerImpl) SetReportCaller(b bool) {
-	l.stdout.SetReportCaller(b)
-}
-
-func (l *LoggerImpl) GetOutput() io.Writer {
-	if l.stdout != nil && l.stdout.Out != nil {
-		return l.stdout.Out
-	}
-	return nil
-}
-
-func (l *LoggerImpl) GetLevel() int {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return int(l.stdout.Level)
-}
-
 func (l *LoggerImpl) setLevel(level int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.stdout.Level = logrus.Level(level)
+	l.l.Level = logrus.Level(level)
 }
 
 func (l *LoggerImpl) SetLevel(level string) {
@@ -120,8 +98,31 @@ func (l *LoggerImpl) SetLevel(level string) {
 	}
 }
 
+func (l *LoggerImpl) GetLevel() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return int(l.l.Level)
+}
+
+func (l *LoggerImpl) SetOutput(out io.Writer) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.l.Out = out
+}
+
+func (l *LoggerImpl) SetReportCaller(b bool) {
+	l.l.SetReportCaller(b)
+}
+
+func (l *LoggerImpl) GetOutput() io.Writer {
+	if l.l != nil && l.l.Out != nil {
+		return l.l.Out
+	}
+	return nil
+}
+
 func (l *LoggerImpl) SetFormatter(formatter logrus.Formatter) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.stdout.Formatter = formatter
+	l.l.Formatter = formatter
 }

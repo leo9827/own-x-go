@@ -1,6 +1,9 @@
 package log
 
-import "io"
+import (
+	"context"
+	"io"
+)
 
 const (
 	LevelPanic = iota
@@ -16,6 +19,11 @@ type level string
 
 const (
 	DebugLevel level = "debug"
+	InfoLevel  level = "info"
+	WarnLevel  level = "warn"
+	ErrorLevel level = "error"
+	FatalLevel level = "fatal"
+	PanicLevel level = "panic"
 )
 
 type Logger interface {
